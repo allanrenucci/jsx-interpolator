@@ -1,0 +1,35 @@
+*.class
+*.log
+
+# sbt specific
+.cache
+.history
+.lib/
+dist/*
+target/
+lib_managed/
+src_managed/
+project/boot/
+project/plugins/project/
+
+# Scala-IDE specific
+.scala_dependencies
+.worksheet
+
+# IntelliJ specific
+.idea
+
+# ENSIME specific
+.ensime_cache/
+.ensime
+
+# macOS specific
+.DS_Store
+
+# Dotty IDE
+/.dotty-ide-dev-port
+/.dotty-ide-artifact
+/.dotty-ide.json
+
+# VS Code
+.vscode/
