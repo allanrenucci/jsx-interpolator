@@ -1,11 +1,11 @@
 package jsx
 
-import scala.quoted._
+import internal.QuoteImpl
 
 // Ideally should be an implicit class but the implicit conversion
 // has to be a rewrite method
 class JsxQuote(ctx: => StringContext) {
-  rewrite def jsx(args: => Any*): Jsx.Repr = ~Macros.quoteImpl('(ctx), '(args))
+  rewrite def jsx(args: => Any*): Jsx.Element = ~QuoteImpl('(ctx), '(args))
 }
 
 object JsxQuote {
