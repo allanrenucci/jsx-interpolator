@@ -56,6 +56,9 @@ final class JsxParser(in: String) {
     elem
   }
 
+  /** Element ::= <Identifier Attributes />
+   *            | <Identifier Attributes > { Element } <Identifier />
+   */
   private def element(): Element = {
     accept('<')
     val name = identifier()
@@ -87,6 +90,10 @@ final class JsxParser(in: String) {
 
   private def isNameStart(ch: Char) = ch.isLetter
 
+  /** Identifier ::= Letter { NameChar }
+   *
+   *  NameChar ::= Letter | '_' | Digit
+   */
   private def identifier(): String = {
     def isNameChar(ch: Char) = isNameStart(ch) || ch == '-' || ch.isDigit
 
@@ -100,7 +107,7 @@ final class JsxParser(in: String) {
     id
   }
 
-  /** attributes ::= { attribute }
+  /** Attributes ::= { Attribute }
    */
   private def attributes(): List[Attribute] = {
     val atts = List.newBuilder[Attribute]
@@ -115,11 +122,11 @@ final class JsxParser(in: String) {
     atts.result()
   }
 
-  /** attribute ::= identifier = attribute_value
+  /** Attribute ::= Identifier = AttributeValue
    *
-   *  attribute_value ::= hole
-   *                    | "DoubleStringCharacters"
-   *                    | 'SingleStringCharacters'
+   *  AttributeValue ::= Hole
+   *                   | "DoubleStringCharacters"
+   *                   | 'SingleStringCharacters'
    */
   private def attribute(): Attribute = {
     val name = identifier()
