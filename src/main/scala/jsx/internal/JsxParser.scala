@@ -152,16 +152,15 @@ final class JsxParser(in: String) {
 
   private def children(): List[Node] = {
     val cs = List.newBuilder[Node]
-    var done = false
 
-    while (!done && !isAtEnd) {
+    while (!isAtEnd) {
       ch_unsafe match {
         case '<' =>
           nextCharOption match {
             case None =>
               error("closing tag or identifier expected", pos = offset + 1)
             case Some('/') =>
-              done = true
+              return cs.result()
             case _ =>
               cs += element()
           }
