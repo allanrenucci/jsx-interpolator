@@ -4,6 +4,7 @@ import scala.quoted._
 import scala.tasty.Tasty
 
 import jsx.Jsx.Element
+import jsx.JsxQuote
 
 final class QuoteImpl(tasty: Tasty) {
   import tasty._
@@ -28,7 +29,7 @@ final class QuoteImpl(tasty: Tasty) {
     sb.toString
   }
 
-  def expr(sc: Expr[StringContext], args: Expr[Seq[Any]]): Expr[Element] = {
+  def expr(receiver: Expr[JsxQuote], args: Expr[Seq[Any]]): Expr[Element] = {
     import Term._
 
     def isStringConstant(tree: Term) = tree match {
@@ -36,18 +37,27 @@ final class QuoteImpl(tasty: Tasty) {
       case _ => false
     }
 
-    // _root_.scala.StringContext.apply([p0, ...]: String*)
-    val parts = sc.toTasty match {
-      case Inlined(_, _,
-        Apply(
-          Select(Select(Select(Ident("_root_"), "scala", _), "StringContext", _), "apply", _),
-          List(Typed(Repeated(values), _)))) if values.forall(isStringConstant) =>
+    def isJsxQuoteConversion(tree: Term) =
+      tree.symbol.fullName == "jsx.package$.JsxQuote"
+
+    def isStringContextApply(tree: Term) =
+      tree.symbol.fullName == "scala.StringContext$.apply"
+
+    // jsx.JsxQuote(StringContext.apply([p0, ...]: String*)
+    val parts = receiver.toTasty.underlyingArgument match {
+      case Apply(conv, List(Apply(fun, List(Typed(Repeated(values), _)))))
+          if isJsxQuoteConversion(conv) &&
+             isStringContextApply(fun) &&
+             values.forall(isStringConstant) =>
         values.collect { case Literal(Constant.String(value)) => value }
       case tree =>
         // TODO: figure out position
         pp(tree)
         abort("String literal expected", 0)
     }
+
+    // [a0, ...]: Any*
+    val Typed(Repeated(args0), _) = args.toTasty.underlyingArgument
 
     val elem =
       try new JsxParser(mkString(parts)).parse()
@@ -56,12 +66,11 @@ final class QuoteImpl(tasty: Tasty) {
           abort(s"Parsing error at pos $pos: $msg", pos)
       }
 
-    // [a0, ...]: Any*
-    val Inlined(_, _, Typed(Repeated(args0), _)) = args.toTasty
+
     val lifter = new Lifter {
       def liftSplice(index: Int) = {
         val splice = args0(index)
-        if (splice.tpe <:< definitions.AnyType) // TODO: should be definitions.StringType
+        if (splice.tpe <:< definitions.StringType)
           splice.toExpr[String]
         else
          abort(s"Type missmatch: expected String, found ${splice.tpe.show}", 0) // TODO: splice.pos
@@ -72,6 +81,6 @@ final class QuoteImpl(tasty: Tasty) {
 }
 
 object QuoteImpl {
-  def apply(sc: Expr[StringContext], args: Expr[Seq[Any]])(implicit tasty: Tasty): Expr[Element] =
-    new QuoteImpl(tasty).expr(sc, args)
+  def apply(receiver: Expr[JsxQuote], args: Expr[Seq[Any]])(implicit tasty: Tasty): Expr[Element] =
+    new QuoteImpl(tasty).expr(receiver, args)
 }
