@@ -20,7 +20,7 @@ final class JsxParser(in: String) {
     else
       ch_unsafe
 
-  private def nextChar =
+  private def nextCharOption =
     if (offset + 1 < in.length) Some(in.charAt(offset + 1))
     else None
 
@@ -88,7 +88,7 @@ final class JsxParser(in: String) {
   private def isNameStart(ch: Char) = ch.isLetter
 
   private def identifier(): String = {
-    def isNameChar(ch: Char) = isNameStart(ch) || ch == '-'
+    def isNameChar(ch: Char) = isNameStart(ch) || ch == '-' || ch.isDigit
 
     val id = takeWhile(isNameChar)
 
@@ -130,8 +130,10 @@ final class JsxParser(in: String) {
 
     val value = ch match {
       case '"' =>
+        next()
         takeWhile(_ != '"')
       case '\'' =>
+        next()
         takeWhile(_ != '\'')
       case other =>
         error(s"""expected: '"' or ''', found: '$other'""")
@@ -148,7 +150,7 @@ final class JsxParser(in: String) {
     while (!done && !isAtEnd) {
       ch_unsafe match {
         case '<' =>
-          nextChar match {
+          nextCharOption match {
             case None =>
               error("closing tag or identifier expected", pos = offset + 1)
             case Some('/') =>
