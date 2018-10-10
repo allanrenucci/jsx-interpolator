@@ -1,0 +1,10 @@
+language: scala
+
+env:
+  - JDK=oraclejdk8
+
+script:
+  - sbt test
+
+before_script:
+  - jdk_switcher use $JDK
