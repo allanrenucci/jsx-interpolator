@@ -4,7 +4,7 @@ import scala.quoted._
 import scala.tasty.Tasty
 
 import jsx.Jsx.Element
-import jsx.JsxQuote
+import jsx.{JsxQuote, Splice}
 
 final class QuoteImpl(tasty: Tasty) {
   import tasty._
@@ -29,7 +29,7 @@ final class QuoteImpl(tasty: Tasty) {
     sb.toString
   }
 
-  def expr(receiver: Expr[JsxQuote], args: Expr[Seq[Any]]): Expr[Element] = {
+  def expr(receiver: Expr[JsxQuote], repeatedArgs: Expr[Seq[Splice]]): Expr[Element] = {
     import Term._
 
     def isStringConstant(tree: Term) = tree match {
@@ -57,7 +57,7 @@ final class QuoteImpl(tasty: Tasty) {
     }
 
     // [a0, ...]: Any*
-    val Typed(Repeated(args0), _) = args.toTasty.underlyingArgument
+    val Typed(Repeated(splices), _) = repeatedArgs.toTasty.underlyingArgument
 
     val elem =
       try new JsxParser(mkString(parts)).parse()
@@ -69,7 +69,7 @@ final class QuoteImpl(tasty: Tasty) {
 
     val lifter = new Lifter {
       def liftSplice(index: Int) = {
-        val splice = args0(index)
+        val splice = splices(index)
         if (splice.tpe <:< definitions.StringType)
           splice.toExpr[String]
         else
@@ -81,6 +81,7 @@ final class QuoteImpl(tasty: Tasty) {
 }
 
 object QuoteImpl {
-  def apply(receiver: Expr[JsxQuote], args: Expr[Seq[Any]])(implicit tasty: Tasty): Expr[Element] =
-    new QuoteImpl(tasty).expr(receiver, args)
+  def apply(receiver: Expr[JsxQuote], repeatedArgs: Expr[Seq[Splice]])
+           (implicit tasty: Tasty): Expr[Element] =
+    new QuoteImpl(tasty).expr(receiver, repeatedArgs)
 }
