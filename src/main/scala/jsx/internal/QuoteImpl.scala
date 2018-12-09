@@ -1,18 +1,18 @@
 package jsx.internal
 
 import scala.quoted._
-import scala.tasty.Tasty
+import scala.tasty.Reflection
 
 import jsx.Jsx.Element
-import jsx.{JsxQuote, Splice}
+import jsx.Splice
 
-final class QuoteImpl(tasty: Tasty) {
-  import tasty._
+final class QuoteImpl(reflect: Reflection) {
+  import reflect._
 
   // for debugging purpose
   private def pp(tree: Tree): Unit = {
     println(tree.show)
-    println(tasty.showSourceCode.showTree(tree))
+    println(tree.showCode)
   }
 
   // TODO: figure out position
@@ -29,51 +29,26 @@ final class QuoteImpl(tasty: Tasty) {
     sb.toString
   }
 
-  def expr(receiver: Expr[JsxQuote], repeatedArgs: Expr[Seq[Splice]]): Expr[Element] = {
+  def expr(ctx: StringContext, args: Expr[Seq[Splice]]): Expr[Element] = {
     import Term._
 
-    def isStringConstant(tree: Term) = tree match {
-      case Literal(_) => true // can only be a String, otherwise would not typecheck
-      case _ => false
-    }
-
-    def isJsxQuoteConversion(tree: Term) =
-      tree.symbol.fullName == "jsx.package$.JsxQuote"
-
-    def isStringContextApply(tree: Term) =
-      tree.symbol.fullName == "scala.StringContext$.apply"
-
-    // jsx.JsxQuote(StringContext.apply([p0, ...]: String*)
-    val parts = receiver.toTasty.underlyingArgument match {
-      case Apply(conv, List(Apply(fun, List(Typed(Repeated(values), _)))))
-          if isJsxQuoteConversion(conv) &&
-             isStringContextApply(fun) &&
-             values.forall(isStringConstant) =>
-        values.collect { case Literal(Constant.String(value)) => value }
-      case tree =>
-        // TODO: figure out position
-        pp(tree)
-        abort("String literal expected", 0)
-    }
-
     // [a0, ...]: Any*
-    val Typed(Repeated(splices), _) = repeatedArgs.toTasty.underlyingArgument
+    val Typed(Repeated(splices), _) = args.unseal.underlyingArgument
 
     val elem =
-      try new JsxParser(mkString(parts)).parse()
+      try new JsxParser(mkString(ctx.parts.toList)).parse()
       catch {
         case JsxParser.ParseError(msg, pos) =>
           abort(s"Parsing error at pos $pos: $msg", pos)
       }
 
-
     val lifter = new Lifter {
       def liftSplice(index: Int) = {
         val splice = splices(index)
         if (splice.tpe <:< definitions.StringType)
-          splice.toExpr[String]
+          splice.seal[String]
         else
-         abort(s"Type missmatch: expected String, found ${splice.tpe.show}", 0) // TODO: splice.pos
+         abort(s"Type missmatch: expected String, found ${splice.tpe.show}", splice.pos.start)
       }
     }
     lifter.liftElement(elem)
@@ -81,7 +56,6 @@ final class QuoteImpl(tasty: Tasty) {
 }
 
 object QuoteImpl {
-  def apply(receiver: Expr[JsxQuote], repeatedArgs: Expr[Seq[Splice]])
-           (implicit tasty: Tasty): Expr[Element] =
-    new QuoteImpl(tasty).expr(receiver, repeatedArgs)
+  def apply(ctx: StringContext, args: Expr[Seq[Splice]])(implicit reflect: Reflection) =
+    new QuoteImpl(reflect).expr(ctx, args)
 }
